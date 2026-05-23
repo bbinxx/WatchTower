@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WatchTower - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { primary: '#3b82f6', darkBg: '#0f172a', darkCard: '#1e293b', darkBorder: '#334155' }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .dark .glass { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-darkBg text-gray-800 dark:text-gray-200 min-h-screen flex">
+    
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white dark:bg-darkCard shadow-lg flex flex-col hidden md:flex z-10 relative transition-colors duration-300">
+        <div class="h-16 flex items-center justify-center border-b dark:border-darkBorder">
+            <h1 class="text-2xl font-bold text-primary flex items-center gap-2"><i class="fa-solid fa-satellite-dish"></i> WatchTower</h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <a href="/dashboard" class="flex items-center gap-3 bg-primary/10 text-primary px-4 py-3 rounded-lg font-medium transition-colors"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+            <a href="/settings" class="flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 px-4 py-3 rounded-lg font-medium transition-colors" id="settingsLink"><i class="fa-solid fa-gear"></i> Settings</a>
+        </nav>
+        <div class="p-4 border-t dark:border-darkBorder">
+            <button onclick="logout()" class="w-full flex items-center gap-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-3 rounded-lg font-medium transition-colors"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 glass shadow-sm flex items-center justify-between px-6 z-20">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden text-gray-600 dark:text-gray-300"><i class="fa-solid fa-bars text-xl"></i></button>
+                <h2 class="text-xl font-semibold hidden sm:block">Overview</h2>
+            </div>
+            <div class="flex items-center gap-4">
+                <button id="themeToggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><i class="fa-solid fa-moon text-lg"></i></button>
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold" id="userInitial">U</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-auto p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold">Your Monitors</h3>
+                <button onclick="openAddModal()" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"><i class="fa-solid fa-plus"></i> Add Monitor</button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border-l-4 border-primary">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Monitors</p>
+                    <p class="text-3xl font-bold mt-2" id="totalMonitors">0</p>
+                </div>
+                <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Up</p>
+                    <p class="text-3xl font-bold mt-2 text-green-500" id="upMonitors">0</p>
+                </div>
+                <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-md border-l-4 border-red-500">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Down</p>
+                    <p class="text-3xl font-bold mt-2 text-red-500" id="downMonitors">0</p>
+                </div>
+            </div>
+
+            <!-- Monitors List -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="monitorsContainer">
+                <!-- Monitor Cards injected here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Monitor Modal -->
+    <div id="addModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity">
+        <div class="bg-white dark:bg-darkCard p-6 rounded-xl shadow-2xl w-full max-w-md transform scale-95 transition-transform">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Add Monitor</h3>
+                <button onclick="closeAddModal()" class="text-gray-500 hover:text-gray-800 dark:hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <form id="addMonitorForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Friendly Name</label>
+                    <input type="text" id="mName" required class="w-full px-3 py-2 rounded border border-gray-300 dark:border-darkBorder bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Type</label>
+                    <select id="mType" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-darkBorder bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary outline-none">
+                        <option value="http">HTTP(s)</option>
+                        <option value="ping">Ping</option>
+                        <option value="port">Port</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">URL or IP</label>
+                    <input type="text" id="mUrl" required class="w-full px-3 py-2 rounded border border-gray-300 dark:border-darkBorder bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary outline-none" placeholder="https://example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Check Interval</label>
+                    <select id="mInterval" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-darkBorder bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary outline-none">
+                        <option value="30">30 Seconds</option>
+                        <option value="60">1 Minute</option>
+                        <option value="300">5 Minutes</option>
+                        <option value="900">15 Minutes</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2 mt-4">
+                    <input type="checkbox" id="mGlobalNotif" checked class="w-4 h-4 text-primary rounded focus:ring-primary border-gray-300">
+                    <label class="text-sm">Use global notification settings</label>
+                </div>
+                
+                <button type="submit" class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-2 rounded transition-colors mt-6">Save Monitor</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/main.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

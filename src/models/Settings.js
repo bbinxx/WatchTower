@@ -1,15 +1,15 @@
-const { db } = require('../config/firebase');
+const db = require('../services/DatabaseService');
 
 class Settings {
     static async getAll() {
-        const doc = await db.collection('system').doc('settings').get();
-        return doc.exists ? doc.data() : this.getDefaults();
+        const doc = await db.getById('system', 'settings');
+        return doc ? doc : this.getDefaults();
     }
 
     static async updateMultiple(settingsObj, userId = null) {
         settingsObj.updated_at = Date.now();
         if (userId) settingsObj.updated_by = userId;
-        await db.collection('system').doc('settings').set(settingsObj, { merge: true });
+        await db.set('system', 'settings', settingsObj);
     }
 
     static getDefaults() {

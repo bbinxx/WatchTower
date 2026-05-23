@@ -6,7 +6,7 @@ const Monitor = require('../models/Monitor');
 const Check = require('../models/Check');
 const SettingsController = require('../controllers/settingsController');
 const MonitorService = require('../services/MonitorService');
-const { admin: firebaseAdmin, db } = require('../config/firebase');
+const AuthService = require('../services/AuthService');
 
 // --- FIREBASE CONFIG (Public) ---
 router.get('/firebase-config', (req, res) => {
@@ -36,17 +36,16 @@ router.get('/firebase-config', (req, res) => {
 });
 
 // --- AUTH ---
-// With Firebase, login happens on the client, and we receive a token.
-// If we need cookie sessions, we can set them here.
+// Login happens on the client, and we receive a token.
 router.post('/login', async (req, res) => {
     const idToken = req.body.token;
     if (!idToken) return res.status(400).json({ error: 'Token missing' });
 
     try {
-        const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+        const decodedToken = await AuthService.verifyIdToken(idToken);
         // Create session cookie
         const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
-        const sessionCookie = await firebaseAdmin.auth().createSessionCookie(idToken, { expiresIn });
+        const sessionCookie = await AuthService.createSession(idToken, expiresIn);
         
         const options = { maxAge: expiresIn, httpOnly: true, secure: process.env.NODE_ENV === 'production' };
         res.cookie('token', sessionCookie, options);

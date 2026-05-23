@@ -1,48 +1,35 @@
-const { db } = require('../config/firebase');
+const db = require('../services/DatabaseService');
 
 class Monitor {
     static async getAll() {
-        const snapshot = await db.collection('monitors').get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return await db.getAll('monitors');
     }
 
     static async getById(id) {
-        const doc = await db.collection('monitors').doc(id).get();
-        return doc.exists ? { id: doc.id, ...doc.data() } : null;
+        return await db.getById('monitors', id);
     }
 
     static async create(data) {
         data.created_at = Date.now();
         data.status = data.status || 'unknown';
-        const docRef = await db.collection('monitors').add(data);
-        return docRef.id;
+        return await db.create('monitors', data);
     }
 
     static async update(id, data) {
-        await db.collection('monitors').doc(id).update(data);
+        await db.update('monitors', id, data);
     }
 
     static async updateStatus(id, status) {
-        await db.collection('monitors').doc(id).update({ status });
+        await db.update('monitors', id, { status });
     }
 
     static async delete(id) {
-        // Cascade delete incidents and checks manually
-        const incidentsSnap = await db.collection('incidents').where('monitor_id', '==', id).get();
-        const batch = db.batch();
+        // Cascade delete incidents and checks
+        await db.deleteByCondition('incidents', 'monitor_id', '==', id);
+        await db.deleteByCondition('checks', 'monitor_id', '==', id);
         
-        incidentsSnap.forEach(doc => {
-            batch.delete(doc.ref);
-            // Alert history could also be deleted here if stored as subcollections or separate docs
-        });
-
-        const checksSnap = await db.collection('checks').where('monitor_id', '==', id).get();
-        checksSnap.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        batch.delete(db.collection('monitors').doc(id));
-        await batch.commit();
+        // Delete the monitor itself
+        await db.delete('monitors', id);
     }
 }
 

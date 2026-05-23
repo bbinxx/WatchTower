@@ -1,4 +1,4 @@
-const { admin } = require('../config/firebase');
+const AuthService = require('../services/AuthService');
 
 module.exports = async (req, res, next) => {
     // Check Authorization header or cookies
@@ -17,8 +17,7 @@ module.exports = async (req, res, next) => {
     }
 
     try {
-        // We created a session cookie in /api/login, so we must verify it as a session cookie
-        const decodedToken = await admin.auth().verifySessionCookie(idToken, true);
+        const decodedToken = await AuthService.verifyToken(idToken);
         req.user = decodedToken;
         next();
     } catch (error) {

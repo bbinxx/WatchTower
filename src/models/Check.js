@@ -1,19 +1,18 @@
-const { db } = require('../config/firebase');
+const db = require('../services/DatabaseService');
 
 class Check {
     static async create(data) {
         data.created_at = Date.now();
-        const docRef = await db.collection('checks').add(data);
-        return docRef.id;
+        return await db.create('checks', data);
     }
 
     static async getRecentByMonitor(monitorId, limit = 50) {
-        const snapshot = await db.collection('checks')
-            .where('monitor_id', '==', monitorId)
-            .orderBy('created_at', 'desc')
-            .limit(limit)
-            .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Querying just by monitor_id avoids composite index requirements
+        // We fetch them all, sort, and slice in JS to stay decoupled
+        const checks = await db.getByCondition('checks', 'monitor_id', '==', monitorId);
+        
+        checks.sort((a, b) => b.created_at - a.created_at);
+        return checks.slice(0, limit);
     }
 }
 

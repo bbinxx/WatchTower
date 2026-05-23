@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const db = require('../services/DatabaseService');
 
 class Incident {
     static async create(monitorId, error) {
@@ -8,38 +8,39 @@ class Incident {
             status: 'open',
             started_at: Date.now()
         };
-        const docRef = await db.collection('incidents').add(data);
-        return docRef.id;
+        return await db.create('incidents', data);
     }
 
     static async getOpenByMonitor(monitorId) {
-        const snapshot = await db.collection('incidents')
-            .where('monitor_id', '==', monitorId)
-            .where('status', 'in', ['open', 'acknowledged'])
-            .orderBy('started_at', 'desc')
-            .limit(1)
-            .get();
-        if (snapshot.empty) return null;
-        const doc = snapshot.docs[0];
-        return { id: doc.id, ...doc.data() };
+        // Fetch all incidents for this monitor
+        const incidents = await db.getByCondition('incidents', 'monitor_id', '==', monitorId);
+        
+        // Filter in JS to avoid composite index requirements in NoSQL databases
+        const openIncidents = incidents.filter(i => i.status === 'open' || i.status === 'acknowledged');
+        
+        if (openIncidents.length === 0) return null;
+        
+        // Sort by most recent
+        openIncidents.sort((a, b) => b.started_at - a.started_at);
+        return openIncidents[0];
     }
 
     static async resolve(id) {
-        await db.collection('incidents').doc(id).update({
+        await db.update('incidents', id, {
             status: 'resolved',
             resolved_at: Date.now()
         });
     }
 
     static async acknowledge(id) {
-        await db.collection('incidents').doc(id).update({
+        await db.update('incidents', id, {
             status: 'acknowledged',
             acknowledged_at: Date.now()
         });
     }
 
     static async logAlert(incidentId, channel, status, error = null) {
-        await db.collection('alert_history').add({
+        await db.create('alert_history', {
             incident_id: incidentId,
             channel,
             status,

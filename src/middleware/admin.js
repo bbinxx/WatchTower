@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const db = require('../services/DatabaseService');
 
 module.exports = async (req, res, next) => {
     if (!req.user) {
@@ -7,13 +7,11 @@ module.exports = async (req, res, next) => {
     }
 
     try {
-        const userDoc = await db.collection('users').doc(req.user.uid).get();
-        if (userDoc.exists && userDoc.data().role === 'admin') {
+        const userDoc = await db.getById('users', req.user.uid);
+        if (userDoc && userDoc.role === 'admin') {
             next();
         } else {
-            // For development, if no users exist, allow first authenticated user to proceed 
-            // Alternatively, in production, restrict based on exact logic.
-            // For WatchTower, let's treat any authenticated Firebase user as an admin to maintain the "personal dashboard" logic
+            // Treat any authenticated user as an admin to maintain the "personal dashboard" logic
             next();
         }
     } catch (e) {

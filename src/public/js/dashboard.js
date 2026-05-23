@@ -51,6 +51,9 @@ function renderMonitors() {
                 </div>
             </div>
             <div class="mt-4 flex gap-2 justify-end">
+                <button onclick="openMonitorModal(${monitor.id})" class="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded transition-colors" title="Edit">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
                 <button onclick="deleteMonitor(${monitor.id})" class="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded transition-colors" title="Delete">
                     <i class="fa-solid fa-trash"></i>
                 </button>
@@ -60,18 +63,60 @@ function renderMonitors() {
     });
 }
 
-function openAddModal() {
-    const modal = document.getElementById('addModal');
+function updateUrlPlaceholder() {
+    const type = document.getElementById('mType').value;
+    const urlInput = document.getElementById('mUrl');
+    if (type === 'http') {
+        urlInput.placeholder = 'https://example.com';
+    } else if (type === 'ping') {
+        urlInput.placeholder = '8.8.8.8 or example.com';
+    } else if (type === 'port') {
+        urlInput.placeholder = '127.0.0.1:27017';
+    }
+}
+
+document.getElementById('mType').addEventListener('change', updateUrlPlaceholder);
+
+function openMonitorModal(id = null) {
+    const modal = document.getElementById('monitorModal');
+    const title = document.getElementById('modalTitle');
+    const form = document.getElementById('monitorForm');
+    const resultDiv = document.getElementById('monitorCheckResult');
+    const saveBtn = document.getElementById('saveMonitorBtn');
+    
+    resultDiv.classList.add('hidden');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Monitor';
+
+    if (id) {
+        title.textContent = 'Edit Monitor';
+        const monitor = monitors.find(m => m.id === id);
+        if (monitor) {
+            document.getElementById('mId').value = monitor.id;
+            document.getElementById('mName').value = monitor.name;
+            document.getElementById('mType').value = monitor.type;
+            document.getElementById('mUrl').value = monitor.url;
+            document.getElementById('mInterval').value = monitor.interval;
+            document.getElementById('mGlobalNotif').checked = monitor.use_global_notifications === 1;
+        }
+    } else {
+        title.textContent = 'Add Monitor';
+        form.reset();
+        document.getElementById('mId').value = '';
+        document.getElementById('mGlobalNotif').checked = true;
+    }
+    
+    updateUrlPlaceholder();
+
     modal.classList.remove('hidden');
-    // slight delay for transition
     setTimeout(() => {
         modal.classList.remove('opacity-0');
         modal.querySelector('div').classList.remove('scale-95');
     }, 10);
 }
 
-function closeAddModal() {
-    const modal = document.getElementById('addModal');
+function closeMonitorModal() {
+    const modal = document.getElementById('monitorModal');
     modal.classList.add('opacity-0');
     modal.querySelector('div').classList.add('scale-95');
     setTimeout(() => {
@@ -79,8 +124,16 @@ function closeAddModal() {
     }, 300);
 }
 
-document.getElementById('addMonitorForm').addEventListener('submit', async (e) => {
+document.getElementById('monitorForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const id = document.getElementById('mId').value;
+    const resultDiv = document.getElementById('monitorCheckResult');
+    const saveBtn = document.getElementById('saveMonitorBtn');
+    
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving & Checking...';
+    resultDiv.classList.add('hidden');
+
     const data = {
         name: document.getElementById('mName').value,
         type: document.getElementById('mType').value,
@@ -90,18 +143,45 @@ document.getElementById('addMonitorForm').addEventListener('submit', async (e) =
     };
 
     try {
-        const res = await apiFetch('/api/monitors', {
-            method: 'POST',
+        const url = id ? `/api/monitors/${id}` : '/api/monitors';
+        const method = id ? 'PUT' : 'POST';
+
+        const res = await apiFetch(url, {
+            method: method,
             body: JSON.stringify(data)
         });
         
         if (res && res.ok) {
-            closeAddModal();
+            const responseData = await res.json();
+            const check = responseData.checkResult;
+            
+            resultDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            
+            if (check && check.status === 'down') {
+                resultDiv.classList.add('bg-red-100', 'text-red-700');
+                resultDiv.innerHTML = `<strong>Check Failed:</strong> ${check.error || 'Unreachable'}`;
+                showToast('Monitor saved, but check failed.', 'error');
+            } else {
+                resultDiv.classList.add('bg-green-100', 'text-green-700');
+                resultDiv.innerHTML = `<strong>Check Successful:</strong> Connected in ${check ? check.responseTime : 0}ms`;
+                showToast('Monitor saved successfully.');
+                
+                // Close modal after success
+                setTimeout(() => {
+                    closeMonitorModal();
+                }, 1500);
+            }
+
             fetchMonitors();
-            e.target.reset();
+        } else {
+            showToast('Failed to save monitor.', 'error');
         }
     } catch (e) {
         console.error(e);
+        showToast('Network error.', 'error');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Monitor';
     }
 });
 

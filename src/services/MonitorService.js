@@ -84,6 +84,8 @@ class MonitorService {
                 AlertService.handleUp(monitor, openIncident);
             }
         }
+        
+        return { status, responseTime, error };
     }
 }
 

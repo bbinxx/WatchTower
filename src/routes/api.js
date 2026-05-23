@@ -9,6 +9,8 @@ const Monitor = require('../models/Monitor');
 const Check = require('../models/Check');
 const SettingsController = require('../controllers/settingsController');
 
+const MonitorService = require('../services/MonitorService');
+
 // --- AUTH ---
 router.post('/login', (req, res) => {
     const { email, password } = req.body;
@@ -37,23 +39,26 @@ router.get('/monitors', auth, (req, res) => {
     res.json(Monitor.getAll());
 });
 
-router.post('/monitors', auth, (req, res) => {
+router.post('/monitors', auth, async (req, res) => {
     const data = { ...req.body, user_id: req.user.id };
-    // stringify JSON fields
     if (data.notification_override && typeof data.notification_override !== 'string') {
         data.notification_override = JSON.stringify(data.notification_override);
     }
     const id = Monitor.create(data);
-    res.status(201).json({ id, ...data });
+    const monitor = Monitor.getById(id);
+    const checkResult = await MonitorService.runCheck(monitor);
+    res.status(201).json({ ...Monitor.getById(id), checkResult });
 });
 
-router.put('/monitors/:id', auth, (req, res) => {
+router.put('/monitors/:id', auth, async (req, res) => {
     const data = req.body;
     if (data.notification_override && typeof data.notification_override !== 'string') {
         data.notification_override = JSON.stringify(data.notification_override);
     }
     Monitor.update(req.params.id, data);
-    res.json({ message: 'Monitor updated' });
+    const monitor = Monitor.getById(req.params.id);
+    const checkResult = await MonitorService.runCheck(monitor);
+    res.json({ message: 'Monitor updated', ...Monitor.getById(req.params.id), checkResult });
 });
 
 router.delete('/monitors/:id', auth, (req, res) => {

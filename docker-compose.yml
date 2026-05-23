@@ -1,0 +1,18 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    restart: unless-stopped
+
+  cron:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    entrypoint: ["node", "src/cron.js"]
+    # Runs once, then exits. Use Docker restart policy or a scheduler.
+    # For continuous monitoring, use a loop:
+    restart: "no"
+    command: >
+      sh -c "while true; do node src/cron.js; sleep 60; done"

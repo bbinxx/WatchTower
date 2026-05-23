@@ -47,7 +47,11 @@ class TelegramService {
             } else {
                 const up = monitors.filter(m => m.status === 'up').length;
                 const down = monitors.filter(m => m.status === 'down').length;
-                botInstance.sendMessage(msg.chat.id, `WatchTower Status:\n✅ UP: ${up}\n🔴 DOWN: ${down}\nTotal: ${monitors.length}`);
+                const waking = monitors.filter(m => m.status === 'waking').length;
+                let statusMsg = `WatchTower Status:\n✅ UP: ${up}\n🔴 DOWN: ${down}`;
+                if (waking > 0) statusMsg += `\n🟡 WAKING: ${waking}`;
+                statusMsg += `\nTotal: ${monitors.length}`;
+                botInstance.sendMessage(msg.chat.id, statusMsg);
             }
         });
 

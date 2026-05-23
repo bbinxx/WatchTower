@@ -16,6 +16,7 @@ async function fetchMonitors() {
 function updateStats() {
     document.getElementById('totalMonitors').textContent = monitors.length;
     document.getElementById('upMonitors').textContent = monitors.filter(m => m.status === 'up').length;
+    document.getElementById('wakingMonitors').textContent = monitors.filter(m => m.status === 'waking').length;
     document.getElementById('downMonitors').textContent = monitors.filter(m => m.status === 'down').length;
 }
 
@@ -39,10 +40,14 @@ function renderMonitors() {
 
     monitors.forEach(monitor => {
         const statusColor = monitor.status === 'up' ? 'text-green-500 bg-green-100 dark:bg-green-900/30' : 
-                            monitor.status === 'down' ? 'text-red-500 bg-red-100 dark:bg-red-900/30' : 'text-gray-500 bg-gray-100 dark:bg-gray-800';
+                            monitor.status === 'down' ? 'text-red-500 bg-red-100 dark:bg-red-900/30' : 
+                            monitor.status === 'waking' ? 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30' : 
+                            'text-gray-500 bg-gray-100 dark:bg-gray-800';
         
         const statusIcon = monitor.status === 'up' ? 'fa-circle-check' : 
-                           monitor.status === 'down' ? 'fa-circle-xmark' : 'fa-circle-question';
+                           monitor.status === 'down' ? 'fa-circle-xmark' : 
+                           monitor.status === 'waking' ? 'fa-spinner fa-spin' :
+                           'fa-circle-question';
 
         const createdAt = monitor.created_at ? new Date(monitor.created_at).toLocaleString() : 'Unknown';
         const updatedAt = monitor.updated_at ? new Date(monitor.updated_at).toLocaleString() : 'Never';
@@ -192,12 +197,17 @@ setInterval(updateLiveTimes, 1000);
 function updateUrlPlaceholder() {
     const type = document.getElementById('mType').value;
     const urlInput = document.getElementById('mUrl');
+    const typeDesc = document.getElementById('mTypeDesc');
+    
     if (type === 'http') {
         urlInput.placeholder = 'https://example.com';
+        if (typeDesc) typeDesc.textContent = 'Checks a website by making an HTTP GET request. Best for APIs and Websites.';
     } else if (type === 'ping') {
         urlInput.placeholder = '8.8.8.8 or example.com';
+        if (typeDesc) typeDesc.textContent = 'Sends ICMP echo requests to a server. Good for checking server availability at the network level.';
     } else if (type === 'port') {
         urlInput.placeholder = '127.0.0.1:27017';
+        if (typeDesc) typeDesc.textContent = 'Attempts a TCP connection to a specific IP and Port. Best for databases, mail servers, etc.';
     }
 }
 
@@ -277,16 +287,24 @@ document.getElementById('monitorForm').addEventListener('submit', async (e) => {
             body: JSON.stringify(data)
         });
         
-        if (res && res.ok) {
-            const responseData = await res.json();
-            const check = responseData.checkResult;
-            
-            resultDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
-            
-            if (check && check.status === 'down') {
+            if (res && res.ok) {
+                const responseData = await res.json();
+                const check = responseData.checkResult;
+                
+                resultDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-yellow-100', 'text-yellow-700');
+                
+                if (check && check.status === 'down') {
                 resultDiv.classList.add('bg-red-100', 'text-red-700');
                 resultDiv.innerHTML = `<strong>Check Failed:</strong> ${check.error || 'Unreachable'}`;
                 showToast('Monitor saved, but check failed.', 'error');
+            } else if (check && check.status === 'waking') {
+                resultDiv.classList.add('bg-yellow-100', 'text-yellow-700');
+                resultDiv.innerHTML = `<strong>Connected:</strong> Service is waking up (Render) in ${check.responseTime}ms`;
+                showToast('Monitor saved. Service is waking up.');
+                
+                setTimeout(() => {
+                    closeMonitorModal();
+                }, 1500);
             } else {
                 resultDiv.classList.add('bg-green-100', 'text-green-700');
                 resultDiv.innerHTML = `<strong>Check Successful:</strong> Connected in ${check ? check.responseTime : 0}ms`;

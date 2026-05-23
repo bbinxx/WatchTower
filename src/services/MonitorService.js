@@ -21,6 +21,13 @@ class MonitorService {
                 const agent = new https.Agent({ rejectUnauthorized: false });
                 const res = await axios.get(monitor.url, { timeout: 10000, httpsAgent: agent });
                 status = 'up';
+                
+                // Detect Render waking up page
+                if (typeof res.data === 'string' && 
+                   (res.data.includes('SERVICE WAKING UP') || res.data.includes('START BUILDING ON RENDER'))) {
+                    status = 'waking';
+                }
+                
                 statusCode = res.status;
                 responseTime = Date.now() - startTime;
             } else if (monitor.type === 'ping') {

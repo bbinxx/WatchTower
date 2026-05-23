@@ -16,6 +16,7 @@ class Monitor {
     }
 
     static async update(id, data) {
+        data.updated_at = Date.now();
         await db.update('monitors', id, data);
     }
 

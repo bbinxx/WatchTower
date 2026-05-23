@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: watchtower
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Add FIREBASE_SERVICE_ACCOUNT and FIREBASE_PUBLIC_CONFIG in the Render Dashboard

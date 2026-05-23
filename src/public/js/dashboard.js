@@ -30,6 +30,10 @@ function renderMonitors() {
         const statusIcon = monitor.status === 'up' ? 'fa-circle-check' : 
                            monitor.status === 'down' ? 'fa-circle-xmark' : 'fa-circle-question';
 
+        const createdAt = monitor.created_at ? new Date(monitor.created_at).toLocaleString() : 'Unknown';
+        const updatedAt = monitor.updated_at ? new Date(monitor.updated_at).toLocaleString() : 'Never';
+        const notifs = monitor.use_global_notifications === 1 ? 'Global Default' : 'Custom Override';
+
         const el = document.createElement('div');
         el.className = 'bg-white dark:bg-darkCard p-5 rounded-xl shadow-md flex flex-col justify-between transition-all hover:shadow-lg border border-transparent hover:border-gray-200 dark:hover:border-darkBorder';
         el.innerHTML = `
@@ -46,16 +50,33 @@ function renderMonitors() {
                         <i class="fa-solid ${statusIcon}"></i> ${monitor.status.toUpperCase()}
                     </div>
                 </div>
-                <div class="text-sm text-gray-500 flex justify-between mt-4 border-t dark:border-darkBorder pt-4">
-                    <span>Check interval: ${monitor.interval}s</span>
+                
+                <div class="grid grid-cols-2 gap-4 mt-6 text-sm text-gray-600 dark:text-gray-400 border-t dark:border-darkBorder pt-4">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Check Interval</p>
+                        <p class="font-medium">${monitor.interval} seconds</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Notifications</p>
+                        <p class="font-medium">${notifs}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Created</p>
+                        <p class="font-medium truncate" title="${createdAt}">${createdAt}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Last Updated</p>
+                        <p class="font-medium truncate" title="${updatedAt}">${updatedAt}</p>
+                    </div>
                 </div>
             </div>
-            <div class="mt-4 flex gap-2 justify-end">
-                <button onclick="openMonitorModal(${monitor.id})" class="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded transition-colors" title="Edit">
-                    <i class="fa-solid fa-pen"></i>
+            
+            <div class="mt-4 flex gap-2 justify-end border-t dark:border-darkBorder pt-4">
+                <button onclick="openMonitorModal('${monitor.id}')" class="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3 py-2 rounded transition-colors text-sm font-medium" title="Edit">
+                    <i class="fa-solid fa-pen mr-1"></i> Edit
                 </button>
-                <button onclick="deleteMonitor(${monitor.id})" class="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded transition-colors" title="Delete">
-                    <i class="fa-solid fa-trash"></i>
+                <button onclick="deleteMonitor('${monitor.id}')" class="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 rounded transition-colors text-sm font-medium" title="Delete">
+                    <i class="fa-solid fa-trash mr-1"></i> Delete
                 </button>
             </div>
         `;

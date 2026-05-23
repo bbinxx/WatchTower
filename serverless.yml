@@ -1,0 +1,21 @@
+service: watchtower
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  environment:
+    NODE_ENV: production
+    # Add FIREBASE_SERVICE_ACCOUNT and FIREBASE_PUBLIC_CONFIG via AWS Systems Manager or directly here (not recommended for secrets)
+
+functions:
+  api:
+    handler: src/index.handler
+    events:
+      - httpApi: '*'
+
+# NOTE: To deploy to AWS Lambda, you must install 'serverless-http' 
+# and wrap your Express app in src/index.js like so:
+# const serverless = require('serverless-http');
+# module.exports.handler = serverless(app);

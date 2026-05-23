@@ -21,7 +21,15 @@ class Monitor {
     }
 
     static async updateStatus(id, status) {
-        await db.update('monitors', id, { status });
+        await db.update('monitors', id, { status, updated_at: Date.now() });
+    }
+
+    static async updateLastCheck(id, status, responseTime) {
+        await db.update('monitors', id, { 
+            status, 
+            last_checked_at: Date.now(),
+            last_response_time: responseTime
+        });
     }
 
     static async delete(id) {

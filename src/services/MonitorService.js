@@ -55,10 +55,8 @@ class MonitorService {
             error
         });
 
-        // Update monitor status if changed
-        if (monitor.status !== status) {
-            await Monitor.updateStatus(monitor.id, status);
-        }
+        // Always update last checked info and status
+        await Monitor.updateLastCheck(monitor.id, status, responseTime);
 
         // Handle Incidents
         const openIncident = await Incident.getOpenByMonitor(monitor.id);

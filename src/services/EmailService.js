@@ -2,8 +2,8 @@ const nodemailer = require('nodemailer');
 const Settings = require('../models/Settings');
 
 class EmailService {
-    static getTransporter() {
-        const settings = Settings.getAll();
+    static async getTransporter() {
+        const settings = await Settings.getAll();
         if (settings.email_enabled !== 'true') return null;
 
         return nodemailer.createTransport({
@@ -18,10 +18,10 @@ class EmailService {
     }
 
     static async sendEmail(to, subject, html) {
-        const settings = Settings.getAll();
+        const settings = await Settings.getAll();
         if (settings.email_enabled !== 'true') return { success: false, error: 'Email disabled' };
 
-        const transporter = this.getTransporter();
+        const transporter = await this.getTransporter();
         if (!transporter) return { success: false, error: 'Transporter configuration invalid' };
 
         try {

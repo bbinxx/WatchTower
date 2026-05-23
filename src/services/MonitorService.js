@@ -18,7 +18,7 @@ class MonitorService {
 
         try {
             if (monitor.type === 'http') {
-                const agent = new https.Agent({ rejectUnauthorized: false }); // for testing SSL issues or ignoring them
+                const agent = new https.Agent({ rejectUnauthorized: false });
                 const res = await axios.get(monitor.url, { timeout: 10000, httpsAgent: agent });
                 status = 'up';
                 statusCode = res.status;
@@ -47,7 +47,7 @@ class MonitorService {
         }
 
         // Save check
-        Check.create({
+        await Check.create({
             monitor_id: monitor.id,
             status,
             response_time: responseTime,
@@ -57,31 +57,26 @@ class MonitorService {
 
         // Update monitor status if changed
         if (monitor.status !== status) {
-            Monitor.updateStatus(monitor.id, status);
+            await Monitor.updateStatus(monitor.id, status);
         }
 
         // Handle Incidents
-        const openIncident = Incident.getOpenByMonitor(monitor.id);
+        const openIncident = await Incident.getOpenByMonitor(monitor.id);
 
         if (status === 'down') {
             if (!openIncident) {
-                // Here we could implement the "2 consecutive failures" logic by checking the last check.
-                // For simplicity, let's create incident immediately or we can check last N checks.
-                const recentChecks = Check.getRecentByMonitor(monitor.id, 2);
+                const recentChecks = await Check.getRecentByMonitor(monitor.id, 2);
                 if (recentChecks.length >= 2 && recentChecks[0].status === 'down' && recentChecks[1].status === 'down') {
-                     // 2 consecutive failures met (since this new check makes it down and previous was down)
-                     // Actually, if we just inserted this check, it is recentChecks[0].
-                     // Let's create an incident.
-                     const incidentId = Incident.create(monitor.id, error).lastInsertRowid;
+                     const incidentId = await Incident.create(monitor.id, error);
                      const newIncident = { id: incidentId, started_at: Math.floor(Date.now() / 1000), error };
-                     AlertService.handleDown(monitor, newIncident);
+                     await AlertService.handleDown(monitor, newIncident);
                 }
             }
         } else if (status === 'up') {
             if (openIncident) {
-                Incident.resolve(openIncident.id);
+                await Incident.resolve(openIncident.id);
                 openIncident.resolved_at = Math.floor(Date.now() / 1000);
-                AlertService.handleUp(monitor, openIncident);
+                await AlertService.handleUp(monitor, openIncident);
             }
         }
         

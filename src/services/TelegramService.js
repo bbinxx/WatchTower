@@ -6,8 +6,8 @@ const Monitor = require('../models/Monitor');
 let botInstance = null;
 
 class TelegramService {
-    static init() {
-        const settings = Settings.getAll();
+    static async init() {
+        const settings = await Settings.getAll();
         if (settings.telegram_enabled === 'true' && settings.telegram_bot_token) {
             try {
                 if (botInstance) {
@@ -34,9 +34,9 @@ class TelegramService {
             botInstance.sendMessage(msg.chat.id, 'Welcome to WatchTower Bot! Your Chat ID is: ' + msg.chat.id);
         });
 
-        botInstance.onText(/\/status(?:\s+(.+))?/, (msg, match) => {
+        botInstance.onText(/\/status(?:\s+(.+))?/, async (msg, match) => {
             const monitorName = match[1];
-            const monitors = Monitor.getAll();
+            const monitors = await Monitor.getAll();
             if (monitorName) {
                 const monitor = monitors.find(m => m.name.toLowerCase() === monitorName.toLowerCase());
                 if (monitor) {
@@ -62,13 +62,13 @@ WatchTower Bot Commands:
             botInstance.sendMessage(msg.chat.id, helpText);
         });
 
-        botInstance.on('callback_query', (query) => {
+        botInstance.on('callback_query', async (query) => {
             const action = query.data;
             const msg = query.message;
             
             if (action.startsWith('ack_')) {
                 const incidentId = action.split('_')[1];
-                Incident.acknowledge(incidentId);
+                await Incident.acknowledge(incidentId);
                 botInstance.answerCallbackQuery(query.id, { text: 'Incident acknowledged!' });
                 botInstance.sendMessage(msg.chat.id, `Incident #${incidentId} has been acknowledged.`);
             } else if (action === 'view_dashboard') {

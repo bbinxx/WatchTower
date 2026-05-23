@@ -1,38 +1,48 @@
-const db = require('../config/database');
+const { db } = require('../config/firebase');
 
 class Monitor {
-    static getAll() {
-        return db.prepare('SELECT * FROM monitors').all();
+    static async getAll() {
+        const snapshot = await db.collection('monitors').get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    static getById(id) {
-        return db.prepare('SELECT * FROM monitors WHERE id = ?').get(id);
+    static async getById(id) {
+        const doc = await db.collection('monitors').doc(id).get();
+        return doc.exists ? { id: doc.id, ...doc.data() } : null;
     }
 
-    static create(data) {
-        const stmt = db.prepare(`
-            INSERT INTO monitors (name, type, url, interval, notification_override, use_global_notifications, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        const info = stmt.run(data.name, data.type, data.url, data.interval, data.notification_override, data.use_global_notifications, data.user_id);
-        return info.lastInsertRowid;
+    static async create(data) {
+        data.created_at = Date.now();
+        data.status = data.status || 'unknown';
+        const docRef = await db.collection('monitors').add(data);
+        return docRef.id;
     }
 
-    static update(id, data) {
-        const stmt = db.prepare(`
-            UPDATE monitors 
-            SET name = ?, type = ?, url = ?, interval = ?, notification_override = ?, use_global_notifications = ?
-            WHERE id = ?
-        `);
-        return stmt.run(data.name, data.type, data.url, data.interval, data.notification_override, data.use_global_notifications, id);
+    static async update(id, data) {
+        await db.collection('monitors').doc(id).update(data);
     }
 
-    static updateStatus(id, status) {
-        return db.prepare('UPDATE monitors SET status = ? WHERE id = ?').run(status, id);
+    static async updateStatus(id, status) {
+        await db.collection('monitors').doc(id).update({ status });
     }
 
-    static delete(id) {
-        return db.prepare('DELETE FROM monitors WHERE id = ?').run(id);
+    static async delete(id) {
+        // Cascade delete incidents and checks manually
+        const incidentsSnap = await db.collection('incidents').where('monitor_id', '==', id).get();
+        const batch = db.batch();
+        
+        incidentsSnap.forEach(doc => {
+            batch.delete(doc.ref);
+            // Alert history could also be deleted here if stored as subcollections or separate docs
+        });
+
+        const checksSnap = await db.collection('checks').where('monitor_id', '==', id).get();
+        checksSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        batch.delete(db.collection('monitors').doc(id));
+        await batch.commit();
     }
 }
 

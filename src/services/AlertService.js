@@ -5,17 +5,17 @@ const Incident = require('../models/Incident');
 
 class AlertService {
     static async handleDown(monitor, incident) {
-        const settings = Settings.getAll();
+        const settings = await Settings.getAll();
         
         let emailRecipients = [];
         let telegramChatIds = [];
 
-        if (monitor.use_global_notifications) {
+        if (monitor.use_global_notifications === 1) {
             try { emailRecipients = JSON.parse(settings.email_recipients || '[]'); } catch(e){}
             try { telegramChatIds = JSON.parse(settings.telegram_chat_ids || '[]'); } catch(e){}
         } else if (monitor.notification_override) {
             try {
-                const override = JSON.parse(monitor.notification_override);
+                const override = typeof monitor.notification_override === 'string' ? JSON.parse(monitor.notification_override) : monitor.notification_override;
                 emailRecipients = override.email || [];
                 telegramChatIds = override.telegram || [];
             } catch(e){}
@@ -34,7 +34,7 @@ class AlertService {
             
             for (const email of emailRecipients) {
                 const res = await EmailService.sendEmail(email, subject, html);
-                Incident.logAlert(incident.id, 'email', res.success ? 'success' : 'failed', res.error);
+                await Incident.logAlert(incident.id, 'email', res.success ? 'success' : 'failed', res.error);
             }
         }
 
@@ -56,23 +56,23 @@ class AlertService {
 
             for (const chatId of telegramChatIds) {
                 const res = await TelegramService.sendMessage(chatId, text, options);
-                Incident.logAlert(incident.id, 'telegram', res.success ? 'success' : 'failed', res.error);
+                await Incident.logAlert(incident.id, 'telegram', res.success ? 'success' : 'failed', res.error);
             }
         }
     }
 
     static async handleUp(monitor, incident) {
-        const settings = Settings.getAll();
+        const settings = await Settings.getAll();
         
         let emailRecipients = [];
         let telegramChatIds = [];
 
-        if (monitor.use_global_notifications) {
+        if (monitor.use_global_notifications === 1) {
             try { emailRecipients = JSON.parse(settings.email_recipients || '[]'); } catch(e){}
             try { telegramChatIds = JSON.parse(settings.telegram_chat_ids || '[]'); } catch(e){}
         } else if (monitor.notification_override) {
             try {
-                const override = JSON.parse(monitor.notification_override);
+                const override = typeof monitor.notification_override === 'string' ? JSON.parse(monitor.notification_override) : monitor.notification_override;
                 emailRecipients = override.email || [];
                 telegramChatIds = override.telegram || [];
             } catch(e){}

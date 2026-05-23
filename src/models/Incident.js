@@ -1,24 +1,51 @@
-const db = require('../config/database');
+const { db } = require('../config/firebase');
 
 class Incident {
-    static create(monitorId, error) {
-        return db.prepare('INSERT INTO incidents (monitor_id, error) VALUES (?, ?)').run(monitorId, error);
+    static async create(monitorId, error) {
+        const data = {
+            monitor_id: monitorId,
+            error: error || null,
+            status: 'open',
+            started_at: Date.now()
+        };
+        const docRef = await db.collection('incidents').add(data);
+        return docRef.id;
     }
 
-    static getOpenByMonitor(monitorId) {
-        return db.prepare("SELECT * FROM incidents WHERE monitor_id = ? AND status != 'resolved' ORDER BY started_at DESC LIMIT 1").get(monitorId);
+    static async getOpenByMonitor(monitorId) {
+        const snapshot = await db.collection('incidents')
+            .where('monitor_id', '==', monitorId)
+            .where('status', 'in', ['open', 'acknowledged'])
+            .orderBy('started_at', 'desc')
+            .limit(1)
+            .get();
+        if (snapshot.empty) return null;
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...doc.data() };
     }
 
-    static resolve(id) {
-        return db.prepare("UPDATE incidents SET status = 'resolved', resolved_at = unixepoch() WHERE id = ?").run(id);
+    static async resolve(id) {
+        await db.collection('incidents').doc(id).update({
+            status: 'resolved',
+            resolved_at: Date.now()
+        });
     }
 
-    static acknowledge(id) {
-        return db.prepare("UPDATE incidents SET status = 'acknowledged', acknowledged_at = unixepoch() WHERE id = ?").run(id);
+    static async acknowledge(id) {
+        await db.collection('incidents').doc(id).update({
+            status: 'acknowledged',
+            acknowledged_at: Date.now()
+        });
     }
 
-    static logAlert(incidentId, channel, status, error = null) {
-        return db.prepare('INSERT INTO alert_history (incident_id, channel, status, error) VALUES (?, ?, ?, ?)').run(incidentId, channel, status, error);
+    static async logAlert(incidentId, channel, status, error = null) {
+        await db.collection('alert_history').add({
+            incident_id: incidentId,
+            channel,
+            status,
+            error,
+            created_at: Date.now()
+        });
     }
 }
 

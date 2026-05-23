@@ -1,32 +1,33 @@
-const db = require('../config/database');
+const { db } = require('../config/firebase');
 
 class Settings {
-    static getAll() {
-        const rows = db.prepare('SELECT key, value FROM system_settings').all();
-        const settings = {};
-        rows.forEach(row => {
-            settings[row.key] = row.value;
-        });
-        return settings;
+    static async getAll() {
+        const doc = await db.collection('system').doc('settings').get();
+        return doc.exists ? doc.data() : this.getDefaults();
     }
 
-    static get(key) {
-        const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get(key);
-        return row ? row.value : null;
+    static async updateMultiple(settingsObj, userId = null) {
+        settingsObj.updated_at = Date.now();
+        if (userId) settingsObj.updated_by = userId;
+        await db.collection('system').doc('settings').set(settingsObj, { merge: true });
     }
 
-    static update(key, value, userId = null) {
-        return db.prepare('UPDATE system_settings SET value = ?, updated_at = unixepoch(), updated_by = ? WHERE key = ?').run(value, userId, key);
-    }
-
-    static updateMultiple(settingsObj, userId = null) {
-        const stmt = db.prepare('UPDATE system_settings SET value = ?, updated_at = unixepoch(), updated_by = ? WHERE key = ?');
-        const updateTransaction = db.transaction((settings) => {
-            for (const [key, value] of Object.entries(settings)) {
-                stmt.run(String(value), userId, key);
-            }
-        });
-        updateTransaction(settingsObj);
+    static getDefaults() {
+        return {
+            email_enabled: 'false',
+            email_smtp_host: 'smtp.gmail.com',
+            email_smtp_port: '587',
+            email_smtp_user: '',
+            email_smtp_pass: '',
+            email_recipients: '[]',
+            email_from_name: 'WatchTower',
+            email_from_address: 'alerts@example.com',
+            telegram_enabled: 'false',
+            telegram_bot_token: '',
+            telegram_chat_ids: '[]',
+            telegram_notify_down: 'true',
+            telegram_notify_up: 'true'
+        };
     }
 }
 

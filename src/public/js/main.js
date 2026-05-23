@@ -1,24 +1,24 @@
 // Utility for generic auth-based fetch
+// Firebase session is stored in httpOnly cookie, so we don't need to pass Bearer token anymore,
+// but we include credentials so cookies are sent.
 async function apiFetch(url, options = {}) {
-    const token = localStorage.getItem('token');
-    if (!token && window.location.pathname !== '/login') {
+    if (!localStorage.getItem('user') && window.location.pathname !== '/login') {
         window.location.href = '/login';
-        return;
+        return null;
     }
 
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers
+    const fetchOptions = {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
     };
 
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
     try {
-        const response = await fetch(url, { ...options, headers });
+        const response = await fetch(url, fetchOptions);
         if (response.status === 401) {
-            localStorage.removeItem('token');
+            localStorage.removeItem('user');
             window.location.href = '/login';
             return null;
         }
@@ -51,7 +51,6 @@ if (themeToggle) {
 // Logout
 function logout() {
     apiFetch('/api/logout', { method: 'POST' }).then(() => {
-        localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
     });

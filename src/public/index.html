@@ -42,44 +42,115 @@
             
             <div id="errorMsg" class="text-red-500 text-sm hidden bg-red-100 dark:bg-red-900/30 p-3 rounded"></div>
             
-            <button type="submit" class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg hover:shadow-xl flex justify-center items-center">
+            <button type="submit" id="loginBtn" class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg hover:shadow-xl flex justify-center items-center">
                 <span>Sign In</span>
             </button>
+
+            <div class="text-center mt-4">
+                <button type="button" id="toggleModeBtn" class="text-primary hover:underline text-sm font-medium">
+                    Don't have an account? Sign up
+                </button>
+            </div>
         </form>
     </div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
         // Check theme
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.classList.add('dark');
         }
+
+        async function initFirebase() {
+            try {
+                const res = await fetch('/api/firebase-config');
+                const config = await res.json();
+                
+                if (Object.keys(config).length === 0) {
+                    const errorMsg = document.getElementById('errorMsg');
+                    errorMsg.textContent = 'Firebase is not configured on the server. Please add FIREBASE_PUBLIC_CONFIG to your .env file.';
+                    errorMsg.classList.remove('hidden');
+                    return null;
+                }
+                
+                const app = initializeApp(config);
+                return getAuth(app);
+            } catch (err) {
+                console.error("Failed to load Firebase config", err);
+                return null;
+            }
+        }
+
+        const authPromise = initFirebase();
+        
+        let isLoginMode = true;
+        
+        document.getElementById('toggleModeBtn').addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            const btn = document.getElementById('loginBtn');
+            const toggleBtn = document.getElementById('toggleModeBtn');
+            const title = document.querySelector('h1');
+            const subtitle = document.querySelector('.text-gray-500');
+            
+            if (isLoginMode) {
+                title.textContent = 'WatchTower';
+                subtitle.textContent = 'Sign in to your monitoring dashboard';
+                btn.querySelector('span').textContent = 'Sign In';
+                toggleBtn.textContent = "Don't have an account? Sign up";
+            } else {
+                title.textContent = 'Create Account';
+                subtitle.textContent = 'Join WatchTower monitoring';
+                btn.querySelector('span').textContent = 'Sign Up';
+                toggleBtn.textContent = 'Already have an account? Sign in';
+            }
+        });
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const errorMsg = document.getElementById('errorMsg');
+            const btn = document.getElementById('loginBtn');
+            
+            errorMsg.classList.add('hidden');
+            btn.disabled = true;
+            btn.querySelector('span').textContent = isLoginMode ? 'Signing in...' : 'Signing up...';
 
             try {
+                const auth = await authPromise;
+                if (!auth) throw new Error('Firebase Auth not initialized');
+
+                let userCredential;
+                if (isLoginMode) {
+                    userCredential = await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                }
+                
+                const idToken = await userCredential.user.getIdToken();
+                
+                // Send token to backend to create session cookie
                 const res = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ token: idToken })
                 });
 
                 const data = await res.json();
                 
                 if (res.ok) {
-                    localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     window.location.href = '/dashboard';
                 } else {
-                    errorMsg.textContent = data.error || 'Login failed';
-                    errorMsg.classList.remove('hidden');
+                    throw new Error(data.error || 'Authentication failed on server');
                 }
             } catch (err) {
-                errorMsg.textContent = 'Network error. Please try again.';
+                errorMsg.textContent = err.message || 'Network error. Please try again.';
                 errorMsg.classList.remove('hidden');
+                btn.disabled = false;
+                btn.querySelector('span').textContent = isLoginMode ? 'Sign In' : 'Sign Up';
             }
         });
     </script>

@@ -10,7 +10,7 @@ class SchedulerService {
     static init() {
         // Master loop every 10 seconds
         cron.schedule('*/10 * * * * *', async () => {
-            const monitors = Monitor.getAll();
+            const monitors = await Monitor.getAll();
             const now = Date.now();
 
             for (const monitor of monitors) {
@@ -19,19 +19,19 @@ class SchedulerService {
 
                 if (now - last >= intervalMs) {
                     lastChecked.set(monitor.id, now);
-                    MonitorService.runCheck(monitor);
+                    MonitorService.runCheck(monitor); // run asynchronously without blocking next
                 }
             }
         });
 
         // Escalation loop every 5 minutes
-        cron.schedule('*/5 * * * *', () => {
-            const monitors = Monitor.getAll();
+        cron.schedule('*/5 * * * *', async () => {
+            const monitors = await Monitor.getAll();
             for (const monitor of monitors) {
-                const openIncident = Incident.getOpenByMonitor(monitor.id);
+                const openIncident = await Incident.getOpenByMonitor(monitor.id);
                 // If open and unacknowledged for more than 5 mins, escalate
                 if (openIncident && !openIncident.acknowledged_at) {
-                    AlertService.handleDown(monitor, openIncident); // resend alert
+                    await AlertService.handleDown(monitor, openIncident); // resend alert
                 }
             }
         });

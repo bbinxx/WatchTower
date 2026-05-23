@@ -1,18 +1,27 @@
-const jwt = require('jsonwebtoken');
+const { admin } = require('../config/firebase');
 
-module.exports = (req, res, next) => {
-    const token = req.cookies?.token || req.headers['authorization']?.split(' ')[1];
-    
-    if (!token) {
+module.exports = async (req, res, next) => {
+    // Check Authorization header or cookies
+    const authHeader = req.headers.authorization;
+    let idToken = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        idToken = authHeader.split('Bearer ')[1];
+    } else if (req.cookies && req.cookies.token) {
+        idToken = req.cookies.token;
+    }
+
+    if (!idToken) {
         if (req.path.startsWith('/api')) return res.status(401).json({ error: 'Unauthorized' });
         return res.redirect('/login');
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-in-production');
-        req.user = decoded;
+        // We created a session cookie in /api/login, so we must verify it as a session cookie
+        const decodedToken = await admin.auth().verifySessionCookie(idToken, true);
+        req.user = decodedToken;
         next();
-    } catch (err) {
+    } catch (error) {
         if (req.path.startsWith('/api')) return res.status(401).json({ error: 'Invalid token' });
         return res.redirect('/login');
     }

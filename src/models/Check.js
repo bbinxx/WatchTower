@@ -1,16 +1,19 @@
-const db = require('../config/database');
+const { db } = require('../config/firebase');
 
 class Check {
-    static create(data) {
-        const stmt = db.prepare(`
-            INSERT INTO checks (monitor_id, status, response_time, status_code, error)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-        return stmt.run(data.monitor_id, data.status, data.response_time, data.status_code, data.error);
+    static async create(data) {
+        data.created_at = Date.now();
+        const docRef = await db.collection('checks').add(data);
+        return docRef.id;
     }
 
-    static getRecentByMonitor(monitorId, limit = 50) {
-        return db.prepare('SELECT * FROM checks WHERE monitor_id = ? ORDER BY created_at DESC LIMIT ?').all(monitorId, limit);
+    static async getRecentByMonitor(monitorId, limit = 50) {
+        const snapshot = await db.collection('checks')
+            .where('monitor_id', '==', monitorId)
+            .orderBy('created_at', 'desc')
+            .limit(limit)
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 }
 

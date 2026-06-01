@@ -7,7 +7,28 @@ const Incident = require('../models/Incident');
 const AlertService = require('./AlertService');
 const https = require('https');
 
+const WAKE_COOLDOWN_MS = 5 * 60 * 1000;
+const lastWakeAttempt = new Map();
+
 class MonitorService {
+    static async wakeUp(monitor) {
+        if (monitor.type !== 'http') return;
+        const now = Date.now();
+        const last = lastWakeAttempt.get(monitor.id) || 0;
+        if (now - last < WAKE_COOLDOWN_MS) return;
+
+        lastWakeAttempt.set(monitor.id, now);
+        console.log(`[WakeUp] Pinging ${monitor.url} to spin up...`);
+
+        try {
+            const agent = new https.Agent({ rejectUnauthorized: false });
+            await axios.get(monitor.url, { timeout: 60000, httpsAgent: agent });
+            console.log(`[WakeUp] ${monitor.url} responded.`);
+        } catch (e) {
+            console.log(`[WakeUp] ${monitor.url} wake request sent (may still be booting): ${e.message}`);
+        }
+    }
+
     static async runCheck(monitor) {
         let status = 'down';
         let responseTime = 0;
@@ -21,13 +42,12 @@ class MonitorService {
                 const agent = new https.Agent({ rejectUnauthorized: false });
                 const res = await axios.get(monitor.url, { timeout: 10000, httpsAgent: agent });
                 status = 'up';
-                
-                // Detect Render waking up page
-                if (typeof res.data === 'string' && 
+
+                if (typeof res.data === 'string' &&
                    (res.data.includes('SERVICE WAKING UP') || res.data.includes('START BUILDING ON RENDER'))) {
                     status = 'waking';
                 }
-                
+
                 statusCode = res.status;
                 responseTime = Date.now() - startTime;
             } else if (monitor.type === 'ping') {
@@ -53,7 +73,6 @@ class MonitorService {
             if (err.response) statusCode = err.response.status;
         }
 
-        // Save check
         await Check.create({
             monitor_id: monitor.id,
             status,
@@ -62,13 +81,13 @@ class MonitorService {
             error
         });
 
-        // Always update last checked info and status
         await Monitor.updateLastCheck(monitor.id, status, responseTime);
 
-        // Handle Incidents
         const openIncident = await Incident.getOpenByMonitor(monitor.id);
 
         if (status === 'down') {
+            this.wakeUp(monitor);
+
             if (!openIncident) {
                 const recentChecks = await Check.getRecentByMonitor(monitor.id, 2);
                 if (recentChecks.length >= 2 && recentChecks[0].status === 'down' && recentChecks[1].status === 'down') {
@@ -84,7 +103,7 @@ class MonitorService {
                 await AlertService.handleUp(monitor, openIncident);
             }
         }
-        
+
         return { status, responseTime, error };
     }
 }

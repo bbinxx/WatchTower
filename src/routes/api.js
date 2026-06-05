@@ -107,4 +107,9 @@ router.put('/settings/telegram', auth, admin, SettingsController.updateTelegramS
 router.post('/settings/email/test', auth, admin, SettingsController.testEmail);
 router.post('/settings/telegram/test', auth, admin, SettingsController.testTelegram);
 
+// --- HEALTH ---
+router.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+});
+
 module.exports = router;

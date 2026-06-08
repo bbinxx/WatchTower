@@ -74,6 +74,8 @@ function showToast(message, type = 'success') {
     msg.textContent = message;
     if (type === 'error') {
         icon.className = 'fa-solid fa-circle-xmark text-red-400';
+    } else if (type === 'warning') {
+        icon.className = 'fa-solid fa-triangle-exclamation text-yellow-400';
     } else {
         icon.className = 'fa-solid fa-circle-check text-green-400';
     }
@@ -84,3 +86,40 @@ function showToast(message, type = 'success') {
         toast.classList.add('translate-y-20', 'opacity-0');
     }, 3000);
 }
+
+// Worker health check
+let workerHealthy = true;
+async function checkWorkerHealth() {
+    try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+            if (!workerHealthy) {
+                workerHealthy = true;
+                hideWorkerBanner();
+            }
+        }
+    } catch (e) {
+        if (workerHealthy) {
+            workerHealthy = false;
+            showWorkerBanner();
+        }
+    }
+}
+
+function showWorkerBanner() {
+    let banner = document.getElementById('workerBanner');
+    if (banner) return;
+    banner = document.createElement('div');
+    banner.id = 'workerBanner';
+    banner.className = 'bg-yellow-500 text-white text-center py-2 text-sm font-medium';
+    banner.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-2"></i> Worker process may be offline. Run <code class="bg-yellow-600 px-1 rounded">npm run dev:all</code> to start all services.';
+    document.body.prepend(banner);
+}
+
+function hideWorkerBanner() {
+    const banner = document.getElementById('workerBanner');
+    if (banner) banner.remove();
+}
+
+setInterval(checkWorkerHealth, 30000);
+checkWorkerHealth();

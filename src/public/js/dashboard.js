@@ -59,6 +59,7 @@ function renderMonitors() {
         const nextCheckedTs = lastCheckedTs ? lastCheckedTs + (monitor.interval * 1000) : null;
         const nextCheckedStr = nextCheckedTs ? new Date(nextCheckedTs).toLocaleString() : 'Pending...';
 
+        const isStale = lastCheckedTs && (Date.now() - lastCheckedTs) > (monitor.interval * 1000 * 3);
         const responseTime = monitor.last_response_time !== undefined ? monitor.last_response_time + ' ms' : 'N/A';
 
         let card = existingCards.get(String(monitor.id));
@@ -83,8 +84,15 @@ function renderMonitors() {
             // 3. Next Check (Countdown target)
             const nextCheckedEl = card.querySelector('.val-next-check');
             if (nextCheckedEl) {
+                const stale = lastCheckedTs && (Date.now() - lastCheckedTs) > (monitor.interval * 1000 * 3);
                 nextCheckedEl.setAttribute('data-timestamp', nextCheckedTs || '');
+                nextCheckedEl.setAttribute('data-stale', stale);
                 nextCheckedEl.title = nextCheckedStr;
+                if (stale) {
+                    nextCheckedEl.classList.add('text-red-500');
+                } else {
+                    nextCheckedEl.classList.remove('text-red-500');
+                }
             }
 
             // 4. Response Time
@@ -132,7 +140,7 @@ function renderMonitors() {
                         </div>
                         <div>
                             <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Next Check</p>
-                            <p class="font-medium truncate live-time val-next-check" title="${nextCheckedStr}" data-timestamp="${nextCheckedTs || ''}" data-type="future">${nextCheckedStr}</p>
+                            <p class="font-medium truncate live-time ${isStale ? 'text-red-500' : ''} val-next-check" title="${nextCheckedStr}" data-timestamp="${nextCheckedTs || ''}" data-type="future" data-stale="${isStale}">${isStale ? 'Worker offline?' : nextCheckedStr}</p>
                         </div>
                         <div>
                             <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Response Time</p>
@@ -184,9 +192,16 @@ function updateLiveTimes() {
             else el.textContent = `${Math.floor(diffSeconds / 3600)}h ago`;
         } else if (type === 'future') {
             const left = Math.floor((ts - now) / 1000);
-            if (left <= 0) el.textContent = 'Checking now...';
-            else if (left < 60) el.textContent = `in ${left}s`;
-            else el.textContent = `in ${Math.floor(left / 60)}m`;
+            if (left <= 0) {
+                const stale = el.getAttribute('data-stale') === 'true';
+                el.textContent = stale ? 'Worker offline?' : 'Checking now...';
+                if (stale) el.classList.add('text-red-500');
+            } else {
+                el.classList.remove('text-red-500');
+                el.setAttribute('data-stale', 'false');
+                if (left < 60) el.textContent = `in ${left}s`;
+                else el.textContent = `in ${Math.floor(left / 60)}m`;
+            }
         }
     });
 }

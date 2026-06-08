@@ -1,117 +1,85 @@
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-        // Reset buttons
         document.querySelectorAll('.tab-btn').forEach(b => {
             b.classList.remove('bg-primary', 'text-white', 'shadow');
             b.classList.add('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-200', 'dark:hover:bg-gray-800');
         });
-        
-        // Active button
+
         const targetBtn = e.currentTarget;
         targetBtn.classList.add('bg-primary', 'text-white', 'shadow');
         targetBtn.classList.remove('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-200', 'dark:hover:bg-gray-800');
 
-        // Switch content
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.getElementById(targetBtn.dataset.target).classList.add('active');
     });
 });
 
-// Load settings
 async function loadSettings() {
     try {
         const res = await apiFetch('/api/settings');
         if (res && res.ok) {
-            const settings = await res.json();
-            
-            // Populate Email
-            document.getElementById('email_enabled').checked = settings.email_enabled === 'true';
-            document.getElementById('email_smtp_host').value = settings.email_smtp_host || '';
-            document.getElementById('email_smtp_port').value = settings.email_smtp_port || '';
-            document.getElementById('email_smtp_user').value = settings.email_smtp_user || '';
-            document.getElementById('email_smtp_pass').value = settings.email_smtp_pass || '';
-            document.getElementById('email_from_name').value = settings.email_from_name || '';
-            document.getElementById('email_from_address').value = settings.email_from_address || '';
-            
+            const s = await res.json();
+
+            document.getElementById('emailStatus').textContent = s.email_enabled === 'true' ? 'Enabled' : 'Disabled';
+            document.getElementById('emailStatus').className = 'font-medium ' + (s.email_enabled === 'true' ? 'text-green-500' : 'text-gray-500');
+            document.getElementById('emailSmtpHost').textContent = s.email_smtp_host || '-';
+            document.getElementById('emailSmtpPort').textContent = s.email_smtp_port || '-';
+            document.getElementById('emailFrom').textContent = s.email_from_name && s.email_from_address ? `${s.email_from_name} <${s.email_from_address}>` : '-';
+
             let emailRecipients = [];
-            try { emailRecipients = JSON.parse(settings.email_recipients || '[]'); } catch(e){}
+            try { emailRecipients = JSON.parse(s.email_recipients || '[]'); } catch(e){}
             document.getElementById('email_recipients').value = emailRecipients.join('\n');
 
-            // Populate Telegram
-            document.getElementById('telegram_enabled').checked = settings.telegram_enabled === 'true';
-            document.getElementById('telegram_bot_token').value = settings.telegram_bot_token || '';
-            
+            document.getElementById('telegramStatus').textContent = s.telegram_enabled === 'true' ? 'Enabled' : 'Disabled';
+            document.getElementById('telegramStatus').className = 'font-medium ' + (s.telegram_enabled === 'true' ? 'text-green-500' : 'text-gray-500');
+            document.getElementById('telegramBotToken').textContent = 'Set in .env';
+
             let telegramChatIds = [];
-            try { telegramChatIds = JSON.parse(settings.telegram_chat_ids || '[]'); } catch(e){}
+            try { telegramChatIds = JSON.parse(s.telegram_chat_ids || '[]'); } catch(e){}
             document.getElementById('telegram_chat_ids').value = telegramChatIds.join('\n');
-            
-            document.getElementById('telegram_notify_down').checked = settings.telegram_notify_down === 'true';
-            document.getElementById('telegram_notify_up').checked = settings.telegram_notify_up === 'true';
+
+            document.getElementById('telegramNotifyDown').textContent = s.telegram_notify_down === 'true' ? 'Yes' : 'No';
+            document.getElementById('telegramNotifyUp').textContent = s.telegram_notify_up === 'true' ? 'Yes' : 'No';
         }
     } catch (e) {
         console.error(e);
     }
 }
 
-// Save Email Settings
-document.getElementById('emailForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
+async function saveEmailRecipients() {
     const recipientsStr = document.getElementById('email_recipients').value;
     const recipients = recipientsStr.split('\n').map(s => s.trim()).filter(s => s);
-
-    const data = {
-        email_enabled: document.getElementById('email_enabled').checked.toString(),
-        email_smtp_host: document.getElementById('email_smtp_host').value,
-        email_smtp_port: document.getElementById('email_smtp_port').value,
-        email_smtp_user: document.getElementById('email_smtp_user').value,
-        email_smtp_pass: document.getElementById('email_smtp_pass').value,
-        email_from_name: document.getElementById('email_from_name').value,
-        email_from_address: document.getElementById('email_from_address').value,
-        email_recipients: recipients
-    };
 
     try {
         const res = await apiFetch('/api/settings/email', {
             method: 'PUT',
-            body: JSON.stringify(data)
+            body: JSON.stringify({ email_recipients: recipients })
         });
         if (res && res.ok) {
-            showToast('Email settings saved successfully');
+            showToast('Email recipients saved');
         }
     } catch (e) {
-        showToast('Error saving email settings', 'error');
+        showToast('Error saving recipients', 'error');
     }
-});
+}
 
-// Save Telegram Settings
-document.getElementById('telegramForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
+async function saveTelegramChatIds() {
     const chatIdsStr = document.getElementById('telegram_chat_ids').value;
     const chatIds = chatIdsStr.split('\n').map(s => s.trim()).filter(s => s);
-
-    const data = {
-        telegram_enabled: document.getElementById('telegram_enabled').checked.toString(),
-        telegram_bot_token: document.getElementById('telegram_bot_token').value,
-        telegram_chat_ids: chatIds,
-        telegram_notify_down: document.getElementById('telegram_notify_down').checked.toString(),
-        telegram_notify_up: document.getElementById('telegram_notify_up').checked.toString()
-    };
 
     try {
         const res = await apiFetch('/api/settings/telegram', {
             method: 'PUT',
-            body: JSON.stringify(data)
+            body: JSON.stringify({ telegram_chat_ids: chatIds })
         });
         if (res && res.ok) {
-            showToast('Telegram settings saved successfully');
+            showToast('Telegram chat IDs saved');
         }
     } catch (e) {
-        showToast('Error saving Telegram settings', 'error');
+        showToast('Error saving chat IDs', 'error');
     }
-});
+}
 
 async function testEmail() {
     try {

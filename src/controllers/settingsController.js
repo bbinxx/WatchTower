@@ -5,7 +5,10 @@ const TelegramService = require('../services/TelegramService');
 exports.getSettings = async (req, res) => {
     try {
         const settings = await Settings.getAll();
-        res.json(settings);
+        const safe = { ...settings };
+        delete safe.email_smtp_pass;
+        delete safe.telegram_bot_token;
+        res.json(safe);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -13,29 +16,9 @@ exports.getSettings = async (req, res) => {
 
 exports.updateEmailSettings = async (req, res) => {
     try {
-        const {
-            email_enabled,
-            email_smtp_host,
-            email_smtp_port,
-            email_smtp_user,
-            email_smtp_pass,
-            email_from_name,
-            email_from_address,
-            email_recipients
-        } = req.body;
-
-        await Settings.updateMultiple({
-            email_enabled,
-            email_smtp_host,
-            email_smtp_port,
-            email_smtp_user,
-            email_smtp_pass,
-            email_from_name,
-            email_from_address,
-            email_recipients: JSON.stringify(email_recipients || [])
-        }, req.user.uid);
-
-        res.json({ message: 'Email settings updated successfully' });
+        const { email_recipients } = req.body;
+        await Settings.updateMultiple({ email_recipients: JSON.stringify(email_recipients || []) }, req.user.uid);
+        res.json({ message: 'Email recipients updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -43,26 +26,10 @@ exports.updateEmailSettings = async (req, res) => {
 
 exports.updateTelegramSettings = async (req, res) => {
     try {
-        const {
-            telegram_enabled,
-            telegram_bot_token,
-            telegram_chat_ids,
-            telegram_notify_down,
-            telegram_notify_up
-        } = req.body;
-
-        await Settings.updateMultiple({
-            telegram_enabled,
-            telegram_bot_token,
-            telegram_chat_ids: JSON.stringify(telegram_chat_ids || []),
-            telegram_notify_down,
-            telegram_notify_up
-        }, req.user.uid);
-
-        // Re-initialize bot with new settings
+        const { telegram_chat_ids } = req.body;
+        await Settings.updateMultiple({ telegram_chat_ids: JSON.stringify(telegram_chat_ids || []) }, req.user.uid);
         await TelegramService.init();
-
-        res.json({ message: 'Telegram settings updated successfully' });
+        res.json({ message: 'Telegram chat IDs updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -71,7 +38,7 @@ exports.updateTelegramSettings = async (req, res) => {
 exports.testEmail = async (req, res) => {
     try {
         const settings = await Settings.getAll();
-        if (settings.email_enabled !== 'true') return res.status(400).json({ error: 'Email notifications are disabled' });
+        if (settings.email_enabled !== 'true') return res.status(400).json({ error: 'Email disabled in env' });
 
         const recipients = JSON.parse(settings.email_recipients || '[]');
         if (recipients.length === 0) return res.status(400).json({ error: 'No recipients configured' });
@@ -90,7 +57,7 @@ exports.testEmail = async (req, res) => {
 exports.testTelegram = async (req, res) => {
     try {
         const settings = await Settings.getAll();
-        if (settings.telegram_enabled !== 'true') return res.status(400).json({ error: 'Telegram notifications are disabled' });
+        if (settings.telegram_enabled !== 'true') return res.status(400).json({ error: 'Telegram disabled in env' });
 
         const chatIds = JSON.parse(settings.telegram_chat_ids || '[]');
         if (chatIds.length === 0) return res.status(400).json({ error: 'No chat IDs configured' });

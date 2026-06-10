@@ -7,23 +7,23 @@ let botInstance = null;
 
 class TelegramService {
     static async init() {
-        const settings = await Settings.getAll();
-        if (settings.telegram_enabled === 'true' && settings.telegram_bot_token) {
-            try {
+        try {
+            const settings = await Settings.getAll();
+            if (settings.telegram_enabled === 'true' && settings.telegram_bot_token) {
                 if (botInstance) {
                     botInstance.stopPolling();
                 }
                 botInstance = new TelegramBot(settings.telegram_bot_token, { polling: true });
                 this.setupCommands();
                 console.log('Telegram Bot initialized');
-            } catch (err) {
-                console.error('Failed to init Telegram bot', err);
+            } else {
+                if (botInstance) {
+                    botInstance.stopPolling();
+                    botInstance = null;
+                }
             }
-        } else {
-            if (botInstance) {
-                botInstance.stopPolling();
-                botInstance = null;
-            }
+        } catch (err) {
+            console.error('Failed to init Telegram bot (Firebase may be unavailable):', err.message);
         }
     }
 

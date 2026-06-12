@@ -1,3 +1,4 @@
+require('dotenv').config();
 const app = require('./app');
 const SchedulerService = require('./services/SchedulerService');
 const TelegramService = require('./services/TelegramService');
@@ -7,11 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, async () => {
     console.log(`WatchTower Server running on port ${PORT}`);
-    
-    // Verify Firebase Connection
     await verifyConnection();
-    
-    // Initialize services
     SchedulerService.init();
     TelegramService.init();
 });

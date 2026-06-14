@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: watchtower
+    name: watchtower-web
     env: node
     buildCommand: npm install
     startCommand: npm start
@@ -9,4 +9,13 @@ services:
         value: production
       - key: PORT
         value: 10000
-      # Add FIREBASE_SERVICE_ACCOUNT and FIREBASE_PUBLIC_CONFIG in the Render Dashboard
+
+  - type: cron
+    name: watchtower-cron
+    env: node
+    buildCommand: npm install
+    startCommand: node src/cron.js
+    schedule: "*/1 * * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Create GitHub releases for all tags
+# Create GitHub releases for all tags with auto-generated changelogs
 # Usage: GITHUB_TOKEN=ghp_xxx ./scripts/create-releases.sh
 
 set -e
@@ -25,17 +25,30 @@ for tag in $(git tag --sort=version:refname); do
   echo "  $tag - creating release..."
 
   PREV_TAG=$(git tag --sort=version:refname | grep -B1 "^${tag}$" | head -1)
-  if [ "$PREV_TAG" = "$tag" ] || [ -z "$PREV_TAG" ]; then
-    BODY=$(git log --pretty=format:"- %s (\`%h\`)" "${tag}")
+
+  if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$tag" ]; then
+    CHANGES=$(git log --pretty=format:"- %s" "${tag}")
   else
-    BODY=$(git log --pretty=format:"- %s (\`%h\`)" "${PREV_TAG}..${tag}")
+    ADDED=$(git log --pretty=format:"- %s" "${PREV_TAG}..${tag}" --grep="^feat")
+    FIXED=$(git log --pretty=format:"- %s" "${PREV_TAG}..${tag}" --grep="^fix")
+    CHANGED=$(git log --pretty=format:"- %s" "${PREV_TAG}..${tag}" --grep="^refactor\|^perf\|^ci\|^docs")
+
+    BODY="## What's Changed\n\n"
+    [ -n "$ADDED" ] && BODY="${BODY}### Added\n${ADDED}\n\n"
+    [ -n "$FIXED" ] && BODY="${BODY}### Fixed\n${FIXED}\n\n"
+    [ -n "$CHANGED" ] && BODY="${BODY}### Changed\n${CHANGED}\n\n"
+
+    if [ -z "$ADDED" ] && [ -z "$FIXED" ] && [ -z "$CHANGED" ]; then
+      BODY="${BODY}$(git log --pretty=format:"- %s" "${PREV_TAG}..${tag}")"
+    fi
+    CHANGES="$BODY"
   fi
 
   PAYLOAD=$(cat <<EOF
 {
   "tag_name": "$tag",
   "name": "$tag",
-  "body": "## Changes\n\n${BODY}",
+  "body": "${CHANGES}",
   "draft": false,
   "prerelease": false
 }

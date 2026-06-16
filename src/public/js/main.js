@@ -123,3 +123,16 @@ function hideWorkerBanner() {
 
 setInterval(checkWorkerHealth, 30000);
 checkWorkerHealth();
+
+// App version
+async function loadVersion() {
+    try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+            const data = await res.json();
+            const el = document.getElementById('appVersion');
+            if (el) el.textContent = 'v' + data.version;
+        }
+    } catch (e) {}
+}
+loadVersion();

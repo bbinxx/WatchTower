@@ -107,9 +107,10 @@ router.put('/settings/telegram', auth, admin, SettingsController.updateTelegramS
 router.post('/settings/email/test', auth, admin, SettingsController.testEmail);
 router.post('/settings/telegram/test', auth, admin, SettingsController.testTelegram);
 
-// --- HEALTH ---
+// --- HEALTH & VERSION ---
 router.get('/health', (req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+    const pkg = require('../../../package.json');
+    res.json({ status: 'ok', version: pkg.version, uptime: process.uptime(), timestamp: Date.now() });
 });
 
 module.exports = router;

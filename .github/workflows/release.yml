@@ -17,33 +17,74 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Sync version to package.json
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          npm install --package-lock-only 2>/dev/null || true
+
       - name: Generate changelog
         id: changelog
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          PREV_TAG=$(git tag --sort=-creatordate | grep -A1 "^${TAG}$" | tail -1)
-          
-          if [ "$PREV_TAG" = "$TAG" ] || [ -z "$PREV_TAG" ]; then
-            CHANGES=$(git log --pretty=format:"- %s (%h)" "${TAG}")
+          TAG=${{ steps.version.outputs.tag }}
+          PREV_TAG=$(git tag --sort=-version:refnum | grep "^v" | sed -n '2p')
+
+          if [ -z "$PREV_TAG" ]; then
+            CHANGES=$(git log --pretty=format:"### Added\n- %s" "$TAG")
           else
-            CHANGES=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}")
+            ADDED=$(git log --pretty=format:"- %s" "$PREV_TAG..$TAG" --grep="^feat" | sed 's/^/- /')
+            FIXED=$(git log --pretty=format:"- %s" "$PREV_TAG..$TAG" --grep="^fix" | sed 's/^/- /')
+            CHANGED=$(git log --pretty=format:"- %s" "$PREV_TAG..$TAG" --grep="^refactor\|^perf\|^ci\|^docs" | sed 's/^/- /')
+
+            CHANGES=""
+            [ -n "$ADDED" ] && CHANGES="${CHANGES}### Added\n${ADDED}\n\n"
+            [ -n "$FIXED" ] && CHANGES="${CHANGES}### Fixed\n${FIXED}\n\n"
+            [ -n "$CHANGED" ] && CHANGES="${CHANGES}### Changed\n${CHANGED}\n\n"
+            [ -z "$CHANGES" ] && CHANGES=$(git log --pretty=format:"- %s" "$PREV_TAG..$TAG")
           fi
-          
+
           echo "changes<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo -e "$CHANGES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git diff --cached --quiet || git commit -m "chore: release ${{ steps.version.outputs.tag }}" && git push
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            ## Changes
-            
+            ## What's Changed
+
             ${{ steps.changelog.outputs.changes }}
-            
-            ## Docker
-            
+
+            ## Installation
+
             ```bash
-            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            # Docker
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}
+
+            # Git
+            git clone https://github.com/${{ github.repository }}.git
+            cd WatchTower
+            git checkout ${{ steps.version.outputs.tag }}
+            npm install
             ```
           generate_release_notes: true

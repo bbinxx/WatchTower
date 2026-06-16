@@ -1,9 +1,13 @@
 {
   "name": "watchtower",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "Uptime monitoring with cron-based architecture for free tier",
+  "main": "src/index.js",
   "scripts": {
+    "start": "node src/index.js",
+    "cron": "node src/cron.js",
+    "dev": "nodemon src/index.js",
+    "dev:cron": "node src/cron.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

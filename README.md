@@ -1,61 +1,135 @@
 # WatchTower
 
-WatchTower is a production-ready uptime monitoring system built with Node.js, Express, SQLite, and vanilla JavaScript. It features robust monitoring capabilities with smart alerting via Email and a Telegram Bot.
+Production-ready uptime monitoring system with cron-based architecture designed for Render free tier. Built with Node.js, Express, Firebase Firestore, and vanilla JavaScript.
 
 ## Features
 
-- **Multi-Protocol Monitoring:** Supports HTTP(S), TCP Ports, and ICMP Ping checks.
-- **Smart Alerting:** Prevents alert fatigue by requiring consecutive failures before triggering downtime incidents.
-- **Notification Channels:** Extensive integration with Email (SMTP) and Telegram Bot, complete with interactive UI buttons.
-- **Dynamic Control Panel:** Pure HTML/JS admin dashboard to manage monitors and control notification configurations dynamically without editing `.env` files.
-- **Lightweight Frontend:** The UI uses vanilla JS and Tailwind CSS via CDN—no complex build steps (like Webpack or Vite) are required.
-- **Dark Mode:** Built-in toggle to switch between an aesthetically pleasing Light and Dark mode interface.
+- **Multi-Protocol Monitoring** - HTTP(S), TCP Ports, and ICMP Ping checks
+- **Smart Alerting** - Requires consecutive failures before triggering incidents to prevent alert fatigue
+- **Auto Wake-Up** - Automatically pings downed Render services to trigger spin-up
+- **Email & Telegram Alerts** - SMTP and Telegram Bot integration with interactive buttons
+- **Cron-Based Architecture** - Monitor checks run via scheduled cron jobs, compatible with Render free tier (no always-on worker needed)
+- **Dynamic Control Panel** - Manage monitors and notification recipients via the web dashboard
+- **Dark Mode** - Built-in light/dark theme toggle
 
-## Prerequisites
+## Architecture
 
-- Node.js (v18 or higher recommended)
+```
+┌─────────────┐     ┌─────────────────┐
+│  Web Server │     │  Cron Service   │
+│  (Dashboard │     │  (Monitor Checks│
+│   + API)    │     │   + Alerts)     │
+└──────┬──────┘     └───────┬─────────┘
+       │                    │
+       └────────┬───────────┘
+                │
+        ┌───────▼────────┐
+        │ Firebase Admin │
+        │   (Firestore)  │
+        └────────────────┘
+```
+
+- **Web** - Serves the dashboard and API. Stays alive via self-ping on Render.
+- **Cron** - Fires every minute via Render Cron Jobs. Checks monitors, saves results, sends alerts. Exits after each run.
 
 ## Quick Start
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+### Local Development
 
-2. **Start the application:**
-   ```bash
-   npm start
-   # Or for development with live reload:
-   npx nodemon src/index.js
-   ```
+```bash
+# 1. Install dependencies
+npm install
 
-3. **Access the dashboard:**
-   Open your browser and navigate to [http://localhost:3000](http://localhost:3000).
+# 2. Copy and configure environment variables
+cp .env.template .env
+# Edit .env with your Firebase credentials
 
-## Default Credentials
+# 3. Start the web server
+npm start
 
-Upon the first startup, a default administrator account is generated:
+# 4. Start the cron service (separate terminal)
+npm run cron
+```
 
-- **Email:** `admin@example.com`
-- **Password:** `admin123`
+Dashboard: [http://localhost:3000](http://localhost:3000)
 
-*(It is highly recommended to change these credentials or create a new user for production use).*
+### Docker
 
-## Notification Setup
+```bash
+# Build and run
+docker compose up -d
 
-After logging in, navigate to the **Settings** page:
-1. **Email Alerts:** Configure your SMTP server details, authentication, and define recipient addresses.
-2. **Telegram Alerts:** Enter your Telegram Bot Token (obtained from [@BotFather](https://t.me/BotFather)) and your target Chat IDs.
+# View logs
+docker compose logs -f
 
-Use the built-in "Send Test" buttons to verify your configurations instantly.
+# Stop
+docker compose down
+```
+
+### Render Deployment
+
+1. Push to GitHub
+2. Connect repo in Render Dashboard
+3. Render auto-detects `render.yaml` and creates:
+   - `watchtower-web` (Web Service)
+   - `watchtower-cron` (Cron Job, every 1 minute)
+
+## Environment Variables
+
+Copy `.env.template` to `.env` and fill in your values:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORT` | No | Server port (default: 3000) |
+| `NODE_ENV` | No | `development` or `production` |
+| `JWT_SECRET` | Yes | Secret for session cookies |
+| `FIREBASE_API_KEY` | Yes | Firebase client config |
+| `FIREBASE_AUTH_DOMAIN` | Yes | Firebase client config |
+| `FIREBASE_DATABASE_URL` | Yes | Firebase client config |
+| `FIREBASE_PROJECT_ID` | Yes | Firebase client config |
+| `FIREBASE_STORAGE_BUCKET` | Yes | Firebase client config |
+| `FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase client config |
+| `FIREBASE_APP_ID` | Yes | Firebase client config |
+| `FIREBASE_MEASUREMENT_ID` | Yes | Firebase client config |
+| `FIREBASE_SERVICE_ACCOUNT` | Yes | Firebase Admin service account JSON (single line) |
+| `EMAIL_ENABLED` | No | `true` or `false` |
+| `EMAIL_SMTP_HOST` | If email | SMTP server hostname |
+| `EMAIL_SMTP_PORT` | If email | SMTP server port |
+| `EMAIL_SMTP_USER` | If email | SMTP username |
+| `EMAIL_SMTP_PASS` | If email | SMTP password |
+| `EMAIL_FROM_NAME` | No | Sender name (default: WatchTower) |
+| `EMAIL_FROM_ADDRESS` | If email | Sender email address |
+| `EMAIL_RECIPIENTS` | No | JSON array of email addresses |
+| `TELEGRAM_ENABLED` | No | `true` or `false` |
+| `TELEGRAM_BOT_TOKEN` | If telegram | Telegram bot token from @BotFather |
+| `TELEGRAM_CHAT_IDS` | No | JSON array of chat IDs |
+| `TELEGRAM_NOTIFY_DOWN` | No | Notify on down (default: true) |
+| `TELEGRAM_NOTIFY_UP` | No | Notify on recovery (default: true) |
+
+## Dashboard Configuration
+
+After deployment, set **recipients** and **chat IDs** via the Settings page in the dashboard. SMTP and bot token are configured via environment variables only.
 
 ## Project Structure
 
-- `src/` - Backend API and application logic.
-  - `config/` - Database initialization and schemas.
-  - `controllers/` - Request handlers for API routes.
-  - `models/` - SQLite database interactions.
-  - `services/` - Core business logic for monitoring, alerts, and scheduling.
-  - `public/` - Vanilla HTML/CSS/JS frontend files.
-- `data/` - Holds the SQLite database (`uptime.db`). *This directory is git-ignored.*
-- `logs/` - Log files. *This directory is git-ignored.*
+```
+src/
+  config/         Firebase initialization
+  controllers/    API request handlers
+  middleware/      Auth and admin middleware
+  models/         Firestore data models
+  public/         Frontend HTML/CSS/JS
+  routes/         Express route definitions
+  services/       Core business logic
+  index.js        Web server entry point
+  cron.js         Cron service entry point
+```
+
+## NPM Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm start` | Start web server |
+| `npm run cron` | Run monitor checks once |
+| `npm run dev` | Start web server with nodemon |
+| `npm run dev:cron` | Run cron manually for testing |

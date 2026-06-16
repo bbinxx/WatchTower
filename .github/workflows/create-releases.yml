@@ -1,0 +1,40 @@
+name: Create Missing Releases
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-releases:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create releases for all tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for tag in $(git tag --sort=version:refname); do
+            if ! gh release view "$tag" > /dev/null 2>&1; then
+              echo "Creating release for $tag..."
+              PREV_TAG=$(git tag --sort=version:refname | grep -B1 "^${tag}$" | head -1)
+              
+              if [ "$PREV_TAG" = "$tag" ] || [ -z "$PREV_TAG" ]; then
+                CHANGES=$(git log --pretty=format:"- %s (%h)" "${tag}")
+              else
+                CHANGES=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${tag}")
+              fi
+              
+              gh release create "$tag" \
+                --title "$tag" \
+                --notes "## Changes\n\n${CHANGES}" \
+                --generate-notes
+              echo "Created release for $tag"
+            else
+              echo "Release for $tag already exists, skipping."
+            fi
+          done
